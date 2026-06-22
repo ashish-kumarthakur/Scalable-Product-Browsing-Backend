@@ -7,10 +7,10 @@ from typing import Optional
 
 app = FastAPI(title="Scalable Product Browsing API")
 
-DB_URI = "postgresql://neondb_owner:npg_cnY3dDHhV8rB@ep-jolly-bonus-ao3sp39f.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
-
+import os
+DATABASE_URL = os.getenv("DATABASE_URL")
 def get_db_connection():
-    return psycopg2.connect(DB_URI, cursor_factory=RealDictCursor)
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 # Helper Function: Safely decode the cursor string sent by frontend
 def decode_cursor(cursor_str: str):
