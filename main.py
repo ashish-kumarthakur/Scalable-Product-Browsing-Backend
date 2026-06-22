@@ -30,52 +30,57 @@ def encode_cursor(timestamp: datetime, last_id: int) -> str:
 
 @app.get("/api/products")
 def get_products(
-    limit: int = Query(default=10, le=100, description="Number of items per page"),
+    search: Optional[str] = Query(default=None, description="Search products by name"),
     category: Optional[str] = Query(default=None, description="Filter products by category"),
-    cursor: Optional[str] = Query(default=None, description="Base64 encoded pagination token")
+    limit: int = Query(default=10, le=100, description="Number of items per page"),
+    offset: int = Query(default=0, description="Number of items to skip")
 ):
-    conn = get_db_connection()
-    cursor_db = conn.cursor()
+    connection = get_db_connection()
+    cursor_db = connection.cursor()
     
-    # Base SQL Query using the optimal index sorting orders
-    query = "SELECT id, name, category, price, created_at FROM products"
-    conditions = []
-    params = []
+    # Base SQL Query
+    base_query = "SELECT id, name, category, price, created_at FROM products WHERE 1=1"
+    query_parameters = []
     
-    # 1. Apply category filtering if requested
+    # 1. Search Filter (Case-insensitive)
+    if search:
+        base_query += " AND name ILIKE %s"
+        query_parameters.append(f"%{search}%")
+        
+    # 2. Category Filter
     if category:
-        conditions.append("category = %s")
-        params.append(category)
+        base_query += " AND category = %s"
+        query_parameters.append(category)
         
-    # 2. Apply Keyset Cursor Pagination filter if cursor exists
-    if cursor:
-        cursor_time, cursor_id = decode_cursor(cursor)
-        # Keyset Pagination logic: Find items OLDER than cursor time.
-        # If times are identical, use the unique ID as the deterministic tie-breaker.
-        conditions.append("(created_at < %s OR (created_at = %s AND id < %s))")
-        params.extend([cursor_time, cursor_time, cursor_id])
-        
-    if conditions:
-        query += " WHERE " + " AND ".join(conditions)
-        
-    # Standard continuous sorting matching our database index exactly
-    query += " ORDER BY category ASC, created_at DESC, id DESC LIMIT %s;" if category else " ORDER BY created_at DESC, id DESC LIMIT %s;"
-    params.append(limit)
+    # 3. Sorting & Pagination (Latest products first)
+    base_query += " ORDER BY id DESC LIMIT %s OFFSET %s"
+    query_parameters.append(limit)
+    query_parameters.append(offset)
     
-    # Execute query
-    cursor_db.execute(query, params)
-    products = cursor_db.fetchall()
+    # Execute query to get products
+    cursor_db.execute(base_query, tuple(query_parameters))
+    products_list = cursor_db.fetchall()
+    
+    # Query to get total count for frontend pagination
+    count_query = "SELECT COUNT(*) FROM products WHERE 1=1"
+    count_parameters = []
+    
+    if search:
+        count_query += " AND name ILIKE %s"
+        count_parameters.append(f"%{search}%")
+    if category:
+        count_query += " AND category = %s"
+        count_parameters.append(category)
+        
+    cursor_db.execute(count_query, tuple(count_parameters))
+    total_products_count = cursor_db.fetchone()['count']
     
     cursor_db.close()
-    conn.close()
+    connection.close()
     
-    # 3. Generate the token for the next page if items remain
-    next_cursor = None
-    if len(products) == limit:
-        last_item = products[-1]
-        next_cursor = encode_cursor(last_item['created_at'], last_item['id'])
-        
     return {
-        "results": products,
-        "next_cursor": next_cursor
+        "total": total_products_count,
+        "limit": limit,
+        "offset": offset,
+        "results": products_list
     }
