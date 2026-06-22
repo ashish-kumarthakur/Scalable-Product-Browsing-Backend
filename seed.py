@@ -1,21 +1,21 @@
 import psycopg2
 from psycopg2.extras import execute_batch
 import random
-from datetime import datetime, timedelta
+import datetime
 
-DB_URI = "postgresql://neondb_owner:npg_cnY3dDHhV8rB@ep-jolly-bonus-ao3sp39f.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
-
+import os
+DATABASE_URL = os.getenv("DATABASE_URL")
 CATEGORIES = ["Electronics", "Clothing", "Home & Kitchen", "Books", "Beauty"]
 PRODUCT_NAMES = ["Pro", "Ultra", "Classic", "Premium", "Elite", "Smart", "Eco"]
 
 def generate_mock_products(count=200000):
     print(f"Generating {count} products in memory...")
     data = []
-    base_time = datetime.now()
+    base_time = datetime.datetime.now()
     
     for i in range(count):
         # Stagger timestamps to simulate logical creation history
-        created_at = base_time - timedelta(seconds=i)
+        created_at = base_time - datetime.timedelta(seconds=i)
         
         category = random.choice(CATEGORIES)
         name = f"{random.choice(PRODUCT_NAMES)} {category[:-1] if category.endswith('s') else category} {i}"
@@ -28,7 +28,7 @@ def generate_mock_products(count=200000):
 
 def seed_database():
     print("Connecting to the database...")
-    conn = psycopg2.connect(DB_URI)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
     
     print("Clearing old records from the table...")
