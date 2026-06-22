@@ -70,8 +70,8 @@ def get_products(
     cursor_db.execute(base_query, tuple(query_parameters))
     products_list = cursor_db.fetchall()
     
-    # Query to get total count for frontend pagination
-    count_query = "SELECT COUNT(*) FROM products WHERE 1=1"
+    
+    count_query = "SELECT COUNT(*) AS total_count FROM products WHERE 1=1"
     count_parameters = []
     
     if search:
@@ -83,8 +83,8 @@ def get_products(
         
     cursor_db.execute(count_query, tuple(count_parameters))
     
-    # FIXED: Access tuple index instead of string key
-    total_products_count = cursor_db.fetchone()[0]
+    
+    total_products_count = cursor_db.fetchone()['total_count']
     
     cursor_db.close()
     connection.close()
