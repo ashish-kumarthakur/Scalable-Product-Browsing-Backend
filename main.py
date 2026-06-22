@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Query, CORSMiddleware
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import base64
@@ -70,6 +71,7 @@ def get_products(
     cursor_db.execute(base_query, tuple(query_parameters))
     products_list = cursor_db.fetchall()
     
+
     
     count_query = "SELECT COUNT(*) AS total_count FROM products WHERE 1=1"
     count_parameters = []
