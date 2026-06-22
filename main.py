@@ -1,18 +1,28 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, CORSMiddleware
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import base64
 from datetime import datetime
 from typing import Optional
+import os
 
 app = FastAPI(title="Scalable Product Browsing API")
 
-import os
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 DATABASE_URL = os.getenv("DATABASE_URL")
+
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-# Helper Function: Safely decode the cursor string sent by frontend
+
 def decode_cursor(cursor_str: str):
     try:
         decoded = base64.b64decode(cursor_str.encode()).decode()
@@ -26,7 +36,6 @@ def decode_cursor(cursor_str: str):
 def encode_cursor(timestamp: datetime, last_id: int) -> str:
     cursor_str = f"{timestamp.isoformat()}||{last_id}"
     return base64.b64encode(cursor_str.encode()).decode()
-
 
 @app.get("/api/products")
 def get_products(
@@ -42,7 +51,7 @@ def get_products(
     base_query = "SELECT id, name, category, price, created_at FROM products WHERE 1=1"
     query_parameters = []
     
-    # 1. Search Filter (Case-insensitive)
+    # 1. Search Filter
     if search:
         base_query += " AND name ILIKE %s"
         query_parameters.append(f"%{search}%")
@@ -52,7 +61,7 @@ def get_products(
         base_query += " AND category = %s"
         query_parameters.append(category)
         
-    # 3. Sorting & Pagination (Latest products first)
+    # 3. Sorting & Pagination
     base_query += " ORDER BY id DESC LIMIT %s OFFSET %s"
     query_parameters.append(limit)
     query_parameters.append(offset)
@@ -73,7 +82,9 @@ def get_products(
         count_parameters.append(category)
         
     cursor_db.execute(count_query, tuple(count_parameters))
-    total_products_count = cursor_db.fetchone()['count']
+    
+    # FIXED: Access tuple index instead of string key
+    total_products_count = cursor_db.fetchone()[0]
     
     cursor_db.close()
     connection.close()
