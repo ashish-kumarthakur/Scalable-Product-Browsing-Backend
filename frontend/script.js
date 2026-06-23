@@ -1,5 +1,5 @@
 const API_BASE_URL = "https://scalable-product-browsing-backend.onrender.com/api/products";
-let currentOffset = 0;
+let nextCursor = null; 
 const limit = 12; 
 
 // DOM Elements
@@ -16,29 +16,60 @@ const loadingDiv = document.getElementById('loading');
 async function fetchProducts() {
     loadingDiv.classList.remove('hidden');
     productsGrid.innerHTML = '';
-    
+
     const searchValue = searchInput.value.trim();
     const categoryValue = categorySelect.value;
 
-    let url = `${API_BASE_URL}?limit=${limit}&offset=${currentOffset}`;
-    if (searchValue) url += `&search=${encodeURIComponent(searchValue)}`;
-    if (categoryValue) url += `&category=${encodeURIComponent(categoryValue)}`;
+    
+    let url = `${API_BASE_URL}?limit=${limit}`;
+
+    
+    if (nextCursor) {
+        url += `&cursor=${encodeURIComponent(nextCursor)}`;
+    }
+
+    
+    if (searchValue) {
+        url += `&search=${encodeURIComponent(searchValue)}`;
+    }
+    if (categoryValue) {
+        url += `&category=${encodeURIComponent(categoryValue)}`;
+    }
 
     try {
-        const response = await fetch(url);
-        const data = await response.json();
+        const response = await fetch(url, {
+            method: 'GET',
+            mode: 'cors',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
         
-        totalCountSpan.innerText = data.total.toLocaleString();
-        renderCards(data.results);
-        updatePaginationControls(data.total);
+        const data = await response.json();
+
+        
+        displayProducts(data.results);
+
+        
+        nextCursor = data.next_cursor; 
+
+        
+        totalCountSpan.textContent = data.total;
+        
+        
+        if (!nextCursor) {
+            nextBtn.disabled = true; 
+        } else {
+            nextBtn.disabled = false;
+        }
+
     } catch (error) {
         console.error("Error fetching data:", error);
-        productsGrid.innerHTML = `<p class="col-span-full text-center text-red-500 font-semibold py-8">⚠️ Failed to load products. Render server might be sleeping. Please try again.</p>`;
     } finally {
         loadingDiv.classList.add('hidden');
     }
 }
-
 function renderCards(products) {
     if (!products || products.length === 0) {
         productsGrid.innerHTML = `<p class="col-span-full text-center text-gray-500 py-12">No products matched your criteria.</p>`;
@@ -71,18 +102,20 @@ searchBtn.addEventListener('click', () => {
     fetchProducts();
 });
 
-prevBtn.addEventListener('click', () => {
-    if (currentOffset >= limit) {
-        currentOffset -= limit;
-        fetchProducts();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+nextBtn.addEventListener('click', () => {
+    if (nextCursor) { 
+        fetchProducts(); 
     }
 });
 
-nextBtn.addEventListener('click', () => {
-    currentOffset += limit;
+nsearchBtn.addEventListener('click', () => {
+    nextCursor = null; 
     fetchProducts();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+categorySelect.addEventListener('change', () => {
+    nextCursor = null; 
+    fetchProducts();
 });
 
 fetchProducts();
