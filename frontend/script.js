@@ -49,7 +49,8 @@ async function fetchProducts() {
         const data = await response.json();
 
         
-        displayProducts(data.results);
+        
+renderCards(data.results);
 
         
         nextCursor = data.next_cursor; 
