@@ -40,39 +40,47 @@ def encode_cursor(timestamp: datetime, last_id: int) -> str:
 
 @app.get("/api/products")
 def get_products(
-    search: Optional[str] = Query(default=None, description="Search products by name"),
-    category: Optional[str] = Query(default=None, description="Filter products by category"),
-    limit: int = Query(default=10, le=100, description="Number of items per page"),
-    offset: int = Query(default=0, description="Number of items to skip")
+    search: Optional[str] = Query(None, description="Search products by name"),
+    category: Optional[str] = Query(None, description="Filter products by category"),
+    limit: int = Query(12, le=100, description="Number of items per page"),
+    cursor: Optional[str] = Query(None, description="Base64 cursor for next page")  
 ):
     connection = get_db_connection()
     cursor_db = connection.cursor()
-    
+
     # Base SQL Query
     base_query = "SELECT id, name, category, price, created_at FROM products WHERE 1=1"
     query_parameters = []
+
+    # 1. Cursor Filter 
+    if cursor:
+        try:
+            last_timestamp, last_id = decode_cursor(cursor)
+            
+            base_query += " AND (created_at < %s OR (created_at = %s AND id < %s))"
+            query_parameters.extend([last_timestamp, last_timestamp, last_id])
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid cursor string provided.")
+
     
-    # 1. Search Filter
     if search:
         base_query += " AND name ILIKE %s"
         query_parameters.append(f"%{search}%")
-        
-    # 2. Category Filter
+
+    
     if category:
         base_query += " AND category = %s"
         query_parameters.append(category)
-        
-    # 3. Sorting & Pagination
-    base_query += " ORDER BY id DESC LIMIT %s OFFSET %s"
-    query_parameters.append(limit)
-    query_parameters.append(offset)
+
     
-    # Execute query to get products
+    base_query += " ORDER BY created_at DESC, id DESC LIMIT %s"
+    query_parameters.append(limit)
+
+    
     cursor_db.execute(base_query, tuple(query_parameters))
     products_list = cursor_db.fetchall()
     
 
-    
     count_query = "SELECT COUNT(*) AS total_count FROM products WHERE 1=1"
     count_parameters = []
     
@@ -82,18 +90,22 @@ def get_products(
     if category:
         count_query += " AND category = %s"
         count_parameters.append(category)
-        
+
     cursor_db.execute(count_query, tuple(count_parameters))
-    
-    
     total_products_count = cursor_db.fetchone()['total_count']
-    
+
     cursor_db.close()
     connection.close()
+
     
+    next_cursor = None
+    if products_list:
+        last_item = products_list[-1]  
+        next_cursor = encode_cursor(last_item['created_at'], last_item['id'])
+
     return {
         "total": total_products_count,
         "limit": limit,
-        "offset": offset,
+        "next_cursor": next_cursor,    
         "results": products_list
     }
