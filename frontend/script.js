@@ -97,22 +97,21 @@ function updatePaginationControls(total) {
     nextBtn.disabled = (currentOffset + limit) >= total;
 }
 
+
+// 1. Search Button Click Listener
 searchBtn.addEventListener('click', () => {
-    currentOffset = 0; 
-    fetchProducts();
-});
-
-nextBtn.addEventListener('click', () => {
-    if (nextCursor) { 
-        fetchProducts(); 
-    }
-});
-
-nsearchBtn.addEventListener('click', () => {
     nextCursor = null; 
     fetchProducts();
 });
 
+// 2. Next Button Click Listener
+nextBtn.addEventListener('click', () => {
+    if (nextCursor) {
+        fetchProducts(); 
+    }
+});
+
+// 3. Category Dropdown Change Listener
 categorySelect.addEventListener('change', () => {
     nextCursor = null; 
     fetchProducts();
